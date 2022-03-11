@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: jx-transport
+  profiles:
+    active: dev
+
+#jasypt:
+#  encryptor:
+#    password: test
+#    algorithm: test
+
+---
+spring:
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      config:
+        enabled: true
+        file-extension: yml
+        server-addr: ${nacos.server.addr:127.0.0.1:8848}
+        group: DEFAULT_GROUP
+        refresh:
+          enable: false
+#        namespace: test
+      discovery:
+        enabled: true
+        register-enabled: false
+        server-addr: ${nacos.server.addr:127.0.0.1:8848}
+
+---
+spring:
+  profiles:
+    active: pro
+  cloud:
+    nacos:
+      config:
+        enabled: true
+        file-extension: yml
+        server-addr: ${nacos.server.addr:127.0.0.1:8848}
+        group: DEFAULT_GROUP
+        refresh:
+          enable: true
+#        namespace: test
+      discovery:
+        enabled: true
+        register-enabled: true
+        server-addr: ${nacos.server.addr:127.0.0.1:8848}

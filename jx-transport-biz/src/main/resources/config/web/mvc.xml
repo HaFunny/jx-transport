@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+       http://www.springframework.org/schema/aop
+       http://www.springframework.org/schema/aop/spring-aop-4.2.xsd">
+    <aop:aspectj-autoproxy proxy-target-class="true"/>
+    <!--自定义注解@JxRestPath,支持Swagger-->
+    <!--
+    自定义注解@JxRestPath，把普通的java方法注册为SpringMVC的Controller，前端可通过restful方式访问该方法，支持get、post两种请求协议
+    参数支持简单数据，基本类型，复杂对象（参数为复杂对象时，参数个数只能有一个）、数组参数；返回的对象统一通过json数据进行封装
+    注解的使用方式为，直接在类或者方法上设置，如：@JxRestPath(value="/getUser",method=RequestMethod.POST),
+    注册到mvc组件工厂时，url路径为"类路径+方法路径"
+    -->
+    <bean class="com.jx.core.framework.web.JxRequestMappingHandlerMapping">
+        <property name="order" value="5"/>
+        <!--order决定了资源的加载顺序，如果没设置的话会以最低优先级加载，可能会被其他加载器优先加载导致请求时找不到url报404错误-->
+        <!--此处可以添加拦截器，拦截器必须实现org.springframework.web.servlet.HandlerInterceptor接口
+        <property name="interceptors">
+            <list>
+                <bean class="com.jx.transport.biz.interceptors.MyInterceptor"></bean>
+            </list>
+        </property>
+        -->
+    </bean>
+    <bean class="com.jx.core.framework.web.JxRequestMappingHandlerAdapter">
+        <property name="order" value="5"/>
+    </bean>
+
+    <!--MVC层统一异常拦截处理-->
+    <bean id="exceptionResolver" class="com.jx.core.framework.web.exception.JxHandlerExceptionResolver">
+        <!--返回视图类型，仅支持"json | page"两种-->
+        <property name="viewType" value="json"/>
+        <!--返回json串中的message字段内容，如果不配置的话，会返回异常的ex.getMessage()-->
+        <property name="defaultErrorMessage" value="服务端处理异常，请联系系统管理员排查"/>
+        <!--缺省返回的错误view（仅page时有效，当exceptionMappings无匹配映射时）-->
+        <property name="defaultErrorView" value="error"/>
+        <!--错误码跟错误view的映射关系（仅page时有效），如果没找到映射关系，则缺省用defaultErrorView-->
+        <property name="exceptionMappings">
+            <map>
+                <entry key="-1" value="error"/>
+                <entry key="101010" value="ex_page"/>
+            </map>
+        </property>
+    </bean>
+
+    <!--不可捕获异常的统一拦截处理-->
+    <bean id="jxUncaughtExceptionHandler"
+          class="com.jx.core.framework.web.exception.JxUncaughtExceptionHandler"/>
+    <bean id="jxUncaughtExceptionHandlerAspect"
+          class="com.jx.core.framework.web.exception.JxUncaughtExceptionHandlerAspect"/>
+    <aop:config>
+        <aop:aspect ref="jxUncaughtExceptionHandlerAspect">
+            <!--切面为Controller下的所有方法-->
+            <aop:pointcut id="performance" expression="execution(* com.jx..controller.*(..))"/>
+            <aop:before method="doBefore" pointcut-ref="performance"/>
+        </aop:aspect>
+    </aop:config>
+
+    <!--Jx统一日志记录-->
+    <bean id="jxLogHandler" class="com.jx.core.framework.log.JxLogHandler"/>
+    <aop:config>
+        <aop:aspect id="aspect" ref="jxLogHandler" order="10000">
+            <aop:pointcut id="controller" expression="execution(public * com.jx..*Controller.*(..))"/>
+            <aop:before method="doControllerBefore" pointcut-ref="controller"/>
+            <aop:around method="doControllerAround" pointcut-ref="controller"/>
+            <aop:after-returning method="doControllerAfterReturning" returning="obj" pointcut-ref="controller"/>
+        </aop:aspect>
+    </aop:config>
+    <aop:config>
+        <aop:aspect id="aspect" ref="jxLogHandler"
+                    order="10000"><!--由于rpc aop也是基于service层实现，所以此order必须大于rpc aop的order-->
+            <aop:pointcut id="service" expression="execution(public * com.jx..*ServiceImpl.*(..))"/>
+            <aop:before method="doServiceBefore" pointcut-ref="service"/>
+            <aop:around method="doServiceAround" pointcut-ref="service"/>
+            <aop:after-returning method="doServiceAfterReturning" returning="obj" pointcut-ref="service"/>
+        </aop:aspect>
+    </aop:config>
+</beans>

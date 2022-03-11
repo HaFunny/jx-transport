@@ -1,0 +1,25 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  cloud:
+    compatibility-verifier:
+      enabled: false
+server:
+  port: 8090
+  servlet:
+    context-path: /jx/transport
+
+
+
+security:
+  oauth2:
+    client:
+      permits: /login**,/admin/VerifyUserPassword,/admin/getUser,/api/**,/swagger**,/base/api/**
+
+management:
+  security:
+    enbale: false
+  endpoints:
+    web:
+      exposure:
+        include: beans

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns="http://www.springframework.org/schema/beans"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+http://www.springframework.org/schema/tx
+http://www.springframework.org/schema/tx/spring-tx-4.2.xsd
+http://www.springframework.org/schema/aop
+http://www.springframework.org/schema/aop/spring-aop-4.2.xsd">
+
+    <!--<bean id="dataSourceMysql" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+        <property name="driverClassName" value="${db.druid.mysql.driverClassName}"/>
+        <property name="url" value="${db.druid.mysql.url}"/>
+        <property name="username" value="${db.druid.mysql.username}"/>
+        <property name="password" value="${db.druid.mysql.password}"/>
+        &lt;!&ndash;配置初始化大小，最小，最大&ndash;&gt;
+        <property name="initialSize" value="${db.druid.mysql.initialSize:1}"/>
+        <property name="minIdle" value="${db.durid.mysql.minIdle}"/>
+        <property name="maxActive" value="${db.durid.mysql.maxActive:20}"/>
+        &lt;!&ndash;配置获取连接等待超时的时间&ndash;&gt;
+        <property name="maxWait" value="${db.durid.mysql.maxWait:60000}"/>
+        &lt;!&ndash;配置间隔多久进行一次检测，检测需要关闭的空闲连接，单位是毫秒&ndash;&gt;
+        <property name="timeBetweenEvictionRunsMillis" value="${db.durid.mysql.timeBetweenEvictionRunsMillis:60000}"/>
+        &lt;!&ndash;配置一个连接在池中最小生存的时间，单位是毫秒&ndash;&gt;
+        <property name="minEvictableIdleTimeMillis" value="${db.durid.mysql.minEvictableIdleTimeMillis:300000}"/>
+        <property name="validationQuery" value="${db.durid.mysql.validationQuery}"/>
+        <property name="testWhileIdle" value="${db.durid.mysql.testWhileIdle:false}"/>
+        <property name="testOnBorrow" value="${db.durid.mysql.testOnBorrow:false}"/>
+        <property name="testOnReturn" value="${db.durid.mysql.testOnReturn:false}"/>
+
+        &lt;!&ndash;打开PSCache，并且指定每个连接上PSCache的大小&ndash;&gt;
+        <property name="poolPreparedStatements" value="${db.durid.mysql.poolPreparedStatements:false}"/>
+        <property name="maxPoolPreparedStatementPerConnectionSize"
+                  value="${db.durid.mysql.maxPoolPreparedStatementPerConnectionSize:20}"/>
+
+        &lt;!&ndash;配置监控统计拦截的filters&ndash;&gt;
+        <property name="filters" value="stat"/>
+    </bean>-->
+
+    <bean id="dataSource" class="com.jx.common.config.dynamic.DynamicDataSource">
+        <property name="defaultTargetDataSource" ref="mysql"/>
+        <property name="targetDataSources">
+            <map key-type="java.lang.String">
+                <entry key="mysql" value-ref="mysql"/>
+                <entry key="pg" value-ref="pg"/>
+            </map>
+        </property>
+    </bean>
+
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="configLocation" value="classpath:sql/mybatis-config.xml"/>
+        <property name="mapperLocations">
+            <array>
+                <value>classpath*:sql/**/*Mapper.xml</value>
+            </array>
+        </property>
+        <!--
+        <property name="typeAliasesPackage" value="com.jx.xxx.*.dao"/>
+        -->
+        <property name="plugins">
+            <array>
+                <bean class="com.github.pagehelper.PageInterceptor">
+                    <property name="properties">
+                        <value>
+                            autoRuntimeDialect=true
+                        </value>
+                    </property>
+                </bean>
+            </array>
+        </property>
+        <property name="databaseIdProvider" ref="dataBaseIdProvider"/>
+    </bean>
+
+    <bean id="dataBaseIdProvider" class="org.apache.ibatis.mapping.VendorDatabaseIdProvider">
+        <property name="properties">
+            <props>
+<!--                <prop key="SQL Server">sqlserver</prop>-->
+<!--                <prop key="DB2">db2</prop>-->
+<!--                <prop key="Oracle">oracle</prop>-->
+                <prop key="MySQL">mysql</prop>
+<!--                <prop key="H2">h2</prop>-->
+                <prop key="Postgre">postgre</prop>
+            </props>
+        </property>
+    </bean>
+
+    <bean id="simpleSqlSession" class="org.mybatis.spring.SqlSessionTemplate" primary="true">
+        <constructor-arg name="sqlSessionFactory" ref="sqlSessionFactory"/>
+        <constructor-arg name="executorType"
+                         value="SIMPLE"/><!--mybatis有三种执行器，SIMPLE(普通),REUSE(重用预处理语句),BATCH(批量)，默认为SIMPLE-->
+    </bean>
+
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!--AOP声明事务管理配置-->
+    <!--需要事务控制的类必须以"BOImpl"结尾，且方法名必须以save,delete,add,modify,update,insert,remove开头-->
+    <aop:config>
+        <aop:pointcut id="pointcut" expression="execution(public * com.jx..*BOImpl.*(..))"/>
+        <aop:advisor advice-ref="jxAdvice" pointcut-ref="pointcut"/>
+    </aop:config>
+
+    <tx:advice id="jxAdvice" transaction-manager="transactionManager">
+        <tx:attributes>
+            <!--读取-->
+            <tx:method name="query*" propagation="REQUIRED" read-only="true"/>
+            <tx:method name="find*" propagation="REQUIRED" read-only="true"/>
+            <tx:method name="get*" propagation="REQUIRED" read-only="true"/>
+            <tx:method name="list*" propagation="REQUIRED" read-only="true"/>
+            <!--新增-->
+            <tx:method name="save*" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+            <tx:method name="add*" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+            <tx:method name="insert*" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+            <!--删除-->
+            <tx:method name="delete*" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+            <tx:method name="remove*" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+            <!--修改-->
+            <tx:method name="modify*" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+            <tx:method name="update*" propagation="REQUIRED" rollback-for="java.lang.Exception"/>
+            <!--其他-->
+            <tx:method name="*" propagation="SUPPORTS"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <tx:annotation-driven transaction-manager="transactionManager"/>
+
+    <!--加入Aspectj配置-->
+    <aop:aspectj-autoproxy/>
+
+</beans>
